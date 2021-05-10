@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <cassert>
 
 #pragma region types
 
@@ -19,7 +18,11 @@ struct node
     node *parent;
     node *left;
     node *right;
+
     color_t color;
+
+    int count;
+
     int key;
 
     node() {}
@@ -30,6 +33,14 @@ struct node
         this->color = RED;
 
         this->key = key;
+        this->count = 1;
+    }
+
+    node(color_t color, int count)
+    {
+        this->parent = this->left = this->right = nullptr;
+        this->color = color;
+        this->count = count;
     }
 };
 
@@ -40,14 +51,19 @@ struct rbtree
 
     rbtree()
     {
-        this->nil = new node;
-        this->nil->color = BLACK;
+        this->nil = new node(BLACK, 0);
         this->root = this->nil;
-        this->root->parent = nullptr;
     }
 };
 
 #pragma endregion
+
+#pragma region helpers
+
+int size(rbtree *t)
+{
+    return t->root->count;
+}
 
 // Set tree's root to the true value.
 void update_root(rbtree *tree)
@@ -56,15 +72,33 @@ void update_root(rbtree *tree)
         tree->root = tree->root->parent;
 }
 
-// rotations are almost the same as for any other type of binary trees.
-// the difference here is caused by the sentinel nil node.
-#pragma region rotations
+void update_count(node *n)
+{
+    if (n == nullptr)
+        return;
+
+    int new_count = 1 + n->left->count + n->right->count;
+    if (n->count != new_count)
+        n->count = new_count;
+    else
+        return;
+
+    if (n->parent != nullptr)
+        update_count(n->parent);
+}
 
 // Rotate left a subtree of root at 'n' replacing it with its right child.
 void leftRotate(rbtree *t, node *n)
 {
     // a node to be the new root of subtree (it's assumed to be not NIL)
     node *pivot = n->right;
+
+    // updating counts
+    n->count -= pivot->count;
+    n->count += n->right->count;
+
+    pivot->count -= n->right->count;
+    pivot->count += n->count;
 
     // connecting n's parent -> pivot
     pivot->parent = n->parent;
@@ -94,6 +128,13 @@ void rightRotate(rbtree *t, node *n)
     // a node to be the new root of subtree (it's assumed to be not NIL)
     node *pivot = n->left;
 
+    // updating counts
+    n->count -= pivot->count;
+    n->count += n->left->count;
+
+    pivot->count -= n->left->count;
+    pivot->count += n->count;
+
     // connecting n's parent -> pivot
     pivot->parent = n->parent;
     if (n->parent != nullptr)
@@ -116,10 +157,6 @@ void rightRotate(rbtree *t, node *n)
     update_root(t);
 }
 
-#pragma endregion
-
-#pragma region search
-
 // Return a pointer to a node of specified key if there's such.
 // Return nil if there's no such node.
 //
@@ -137,6 +174,115 @@ node *find_by_key(rbtree *tree, int key)
 
     return p;
 }
+
+// Return a node of the min key in subtree of root n.
+node *minimum(rbtree *t, node *n)
+{
+    while (n->left != t->nil)
+        n = n->left;
+
+    return n;
+}
+
+// Return a node of the max key in subtree of root n.
+node *maximum(rbtree *t, node *n)
+{
+    while (n->right != t->nil)
+        n = n->right;
+
+    return n;
+}
+
+// Recursive helper function for the preorder function.
+void preorderHelper(std::vector<int> &keys, rbtree *t, node *n)
+{
+    keys.push_back(n->key);
+
+    if (n->left != t->nil)
+        preorderHelper(keys, t, n->left);
+
+    if (n->right != t->nil)
+        preorderHelper(keys, t, n->right);
+}
+
+// Return vector of tree's keys preorder.
+std::vector<int> preorder(rbtree *tree)
+{
+    std::vector<int> keys;
+
+    if (tree->root != tree->nil)
+        preorderHelper(keys, tree, tree->root);
+
+    return keys;
+}
+
+// Recursive helper function for the inorder function.
+void inorderHelper(std::vector<int> &keys, rbtree *t, node *n)
+{
+    if (n->left != t->nil)
+        inorderHelper(keys, t, n->left);
+
+    keys.push_back(n->key);
+
+    if (n->right != t->nil)
+        inorderHelper(keys, t, n->right);
+}
+
+// Return vector of tree's keys in order.
+std::vector<int> inorder(rbtree *tree)
+{
+    std::vector<int> keys;
+
+    if (tree->root != tree->nil)
+        inorderHelper(keys, tree, tree->root);
+
+    return keys;
+}
+
+// Recursive helper function for the postorder function.
+void postorderHelper(std::vector<int> &keys, rbtree *t, node *n)
+{
+    if (n->left != t->nil)
+        postorderHelper(keys, t, n->left);
+
+    if (n->right != t->nil)
+        postorderHelper(keys, t, n->right);
+
+    keys.push_back(n->key);
+}
+
+// Return vector of tree's keys postorder.
+std::vector<int> postorder(rbtree *tree)
+{
+    std::vector<int> keys;
+
+    if (tree->root != tree->nil)
+        postorderHelper(keys, tree, tree->root);
+
+    return keys;
+}
+
+// Connect a subtree of root v in place of a subtree of root u in tree.
+// u should not be NIL;
+void transplant(rbtree *tree, node *u, node *v)
+{
+    if (u->parent == nullptr)
+        tree->root = v;
+    else if (u == u->parent->left)
+        u->parent->left = v;
+    else
+        u->parent->right = v;
+
+    v->parent = u->parent;
+    update_root(tree);
+    update_count(v->parent);
+}
+
+#pragma endregion
+
+#pragma region insertion
+
+// Source: http://neerc.ifmo.ru/wiki/index.php?title=%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%BE-%D1%87%D0%B5%D1%80%D0%BD%D0%BE%D0%B5_%D0%B4%D0%B5%D1%80%D0%B5%D0%B2%D0%BE#.D0.92.D1.81.D1.82.D0.B0.D0.B2.D0.BA.D0.B0_.D1.8D.D0.BB.D0.B5.D0.BC.D0.B5.D0.BD.D1.82.D0.B0
 
 // Return a pointer to a node which would be a parent
 // of a new node with a specified key.
@@ -159,12 +305,6 @@ node *find_insert_point(rbtree *tree, int key)
     return q;
 }
 
-#pragma endregion
-
-#pragma region insertion
-
-// Source: http://neerc.ifmo.ru/wiki/index.php?title=%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%BE-%D1%87%D0%B5%D1%80%D0%BD%D0%BE%D0%B5_%D0%B4%D0%B5%D1%80%D0%B5%D0%B2%D0%BE#.D0.92.D1.81.D1.82.D0.B0.D0.B2.D0.BA.D0.B0_.D1.8D.D0.BB.D0.B5.D0.BC.D0.B5.D0.BD.D1.82.D0.B0
-
 // Insert a new node with specified key into a tree keeping it balanced.
 void insert_node(rbtree *tree, int key)
 {
@@ -186,6 +326,8 @@ void insert_node(rbtree *tree, int key)
         insert_point->right = new_node;
     else
         insert_point->left = new_node;
+
+    update_count(insert_point);
 
     // rebalancing:
     node *t = new_node;
@@ -247,143 +389,9 @@ void insert_node(rbtree *tree, int key)
 
 #pragma endregion
 
-#pragma region min and max
-
-// Return a node of the min key in subtree of root n.
-node *minimum(rbtree *t, node *n)
-{
-    while (n->left != t->nil)
-        n = n->left;
-
-    return n;
-}
-
-// Return a node of the max key in subtree of root n.
-node *maximum(rbtree *t, node *n)
-{
-    while (n->right != t->nil)
-        n = n->right;
-
-    return n;
-}
-
-#pragma endregion
-
-#pragma region traversals
-
-#pragma region preorder
-
-// Recursive helper function for the preorder function.
-void preorderHelper(std::vector<int> &keys, rbtree *t, node *n)
-{
-    keys.push_back(n->key);
-
-    if (n->left != t->nil)
-        preorderHelper(keys, t, n->left);
-
-    if (n->right != t->nil)
-        preorderHelper(keys, t, n->right);
-}
-
-// Return vector of tree's keys preorder.
-std::vector<int> preorder(rbtree *tree)
-{
-    std::vector<int> keys;
-
-    if (tree->root != tree->nil)
-        preorderHelper(keys, tree, tree->root);
-
-    return keys;
-}
-
-#pragma endregion
-
-#pragma region inorder
-
-// Recursive helper function for the inorder function.
-void inorderHelper(std::vector<int> &keys, rbtree *t, node *n)
-{
-    if (n->left != t->nil)
-        inorderHelper(keys, t, n->left);
-
-    keys.push_back(n->key);
-
-    if (n->right != t->nil)
-        inorderHelper(keys, t, n->right);
-}
-
-// Return vector of tree's keys in order.
-std::vector<int> inorder(rbtree *tree)
-{
-    std::vector<int> keys;
-
-    if (tree->root != tree->nil)
-        inorderHelper(keys, tree, tree->root);
-
-    return keys;
-}
-
-#pragma endregion
-
-#pragma region postorder
-
-// Recursive helper function for the postorder function.
-void postorderHelper(std::vector<int> &keys, rbtree *t, node *n)
-{
-    if (n->left != t->nil)
-        postorderHelper(keys, t, n->left);
-
-    if (n->right != t->nil)
-        postorderHelper(keys, t, n->right);
-
-    keys.push_back(n->key);
-}
-
-// Return vector of tree's keys postorder.
-std::vector<int> postorder(rbtree *tree)
-{
-    std::vector<int> keys;
-
-    if (tree->root != tree->nil)
-        postorderHelper(keys, tree, tree->root);
-
-    return keys;
-}
-
-#pragma endregion
-
-#pragma endregion
-
-#pragma region transplantation
-
-// Replace node u with node v in tree.
-// u should not be NIL;
-void transplant(rbtree *tree, node *u, node *v)
-{
-    if (u->parent == nullptr)
-        tree->root = v;
-    else if (u == u->parent->left)
-        u->parent->left = v;
-    else
-        u->parent->right = v;
-
-    v->parent = u->parent;
-    update_root(tree);
-}
-
-#pragma endregion
-
 #pragma region deletion
 
 // Source: Cormen's Intro to Algorithms.
-
-node *sibling(node *n)
-{
-    if (n->parent->left == n)
-        return n->parent->right;
-    else
-        return n->parent->left;
-}
 
 void delete_fixup(rbtree *t, node *x)
 {
@@ -487,11 +495,18 @@ void delete_node(rbtree *tree, int key)
         y = minimum(tree, z->right);
         y_original_color = y->color;
         x = y->right;
+        node *q;
 
         if (y->parent == z)
+        {
+            q = y;
+
             x->parent = y;
+        }
         else
         {
+            q = y->parent;
+
             transplant(tree, y, y->right);
             y->right = z->right;
             y->right->parent = y;
@@ -501,10 +516,63 @@ void delete_node(rbtree *tree, int key)
         y->left = z->left;
         y->left->parent = y;
         y->color = z->color;
+
+        update_count(q);
     }
 
     if (y_original_color == BLACK)
         delete_fixup(tree, x);
+
+    delete z;
+}
+
+#pragma endregion
+
+#pragma region search by index and iterators
+
+node *next(rbtree *t, node *x)
+{
+    if (x->right != t->nil)
+        return minimum(t, x->right);
+    node *y = x->parent;
+    while (y != nullptr && x == y->right)
+    {
+        x = y;
+        y = y->parent;
+    }
+    return y;
+}
+
+node *prev(rbtree *t, node *x)
+{
+    if (x->left != t->nil)
+        return maximum(t, x->left);
+    node *y = x->parent;
+    while (y != nullptr && x == y->left)
+    {
+        x = y;
+        y = y->parent;
+    }
+    return y;
+}
+
+node *index_helper(node *n, int index)
+{
+    if (index < n->left->count)
+        return index_helper(n->left, index);
+
+    if (n->left->count == index)
+        return n;
+
+    return index_helper(n->right, index - n->left->count - 1);
+}
+
+node *find_by_index(rbtree *t, int index)
+{
+    if (index < 0)
+        index = t->root->count - index;
+
+    return index_helper(t->root, index);
 }
 
 #pragma endregion
@@ -522,17 +590,17 @@ void wgv_reds_and_conns_input(std::string &conn_info, std::string &reds_info, rb
     if (n->right != tree->nil)
     {
         int nr_occs = occurrences[n->right->key];
-        conn_info += ("\"" + std::to_string(n->key) + (n_occs ? "_" + std::to_string(n_occs) : "") + "\"" + " -> " + "\"" + std::to_string(n->right->key) + (nr_occs ? "_" + std::to_string(nr_occs) : "") + "\"" + " [label = \"right\"]; ");
+        conn_info += ("\"" + std::to_string(n->key) + (n_occs ? "_" + std::to_string(n_occs) : "") + " " + std::to_string(n->count) + "\"" + " -> " + "\"" + std::to_string(n->right->key) + (nr_occs ? "_" + std::to_string(nr_occs) : "") + " " + std::to_string(n->right->count) + "\"" + " [label = \"right\"]; ");
     }
 
     if (n->left != tree->nil)
     {
         int nl_occs = occurrences[n->left->key];
-        conn_info += ("\"" + std::to_string(n->key) + (n_occs ? "_" + std::to_string(n_occs) : "") + "\"" + " -> " + "\"" + std::to_string(n->left->key) + (nl_occs ? "_" + std::to_string(nl_occs) : "") + "\"" + " [label = \"left\"]; ");
+        conn_info += ("\"" + std::to_string(n->key) + (n_occs ? "_" + std::to_string(n_occs) : "") + " " + std::to_string(n->count) + "\"" + " -> " + "\"" + std::to_string(n->left->key) + (nl_occs ? "_" + std::to_string(nl_occs) : "") + " " + std::to_string(n->left->count) + "\"" + " [label = \"left\"]; ");
     }
 
     if (n->color == RED)
-        reds_info += ("\"" + std::to_string(n->key) + (n_occs ? "_" + std::to_string(n_occs) : "") + "\" ");
+        reds_info += ("\"" + std::to_string(n->key) + (n_occs ? "_" + std::to_string(n_occs) : "") + " " + std::to_string(n->count) + "\" ");
 
     wgv_reds_and_conns_input(conn_info, reds_info, tree, n->left, occurrences);
     wgv_reds_and_conns_input(conn_info, reds_info, tree, n->right, occurrences);

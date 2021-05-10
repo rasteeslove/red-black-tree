@@ -13,7 +13,7 @@ int main()
     // generating 1_000_000 random ints:
     srand(time(NULL));
     std::vector<int> random_nums;
-    for (int i = 0; i < 1000000; i++)
+    for (int i = 0; i < 50; i++)
         random_nums.push_back(rand());
 
     // 1_000_000 insertions:
@@ -33,17 +33,31 @@ int main()
 
     auto rng = std::default_random_engine{};
     std::shuffle(std::begin(random_nums), std::end(random_nums), rng);
+    //random_nums.erase(random_nums.end() - 50, random_nums.end());
 
     begin = std::chrono::steady_clock::now();
 
     for (int a : random_nums)
     {
-        delete_node(t, a);
+        //delete_node(t, a);
     }
 
     end = std::chrono::steady_clock::now();
 
-    std::cout << "Deletion time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+    //std::cout << "Deletion time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
+    std::cout << "\n\n\n\n\n" + std::string(50, '*') + "\n\n\n\n\n";
+
+    std::cout << wgv_input(t);
+
+    std::cout << "\n\n\n\n\n" + std::string(50, '*') + "\n\n\n\n\n";
+
+    node *x = minimum(t, t->root);
+    while (x != nullptr)
+    {
+        std::cout << x->key << " ";
+        x = next(t, x);
+    }
 
     return 0;
 }
