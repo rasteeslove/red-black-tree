@@ -95,9 +95,9 @@ void leftRotate(rbtree *t, node *n)
 
     // updating counts
     n->count -= pivot->count;
-    n->count += n->right->count;
+    n->count += pivot->left->count;
 
-    pivot->count -= n->right->count;
+    pivot->count -= pivot->left->count;
     pivot->count += n->count;
 
     // connecting n's parent -> pivot
@@ -130,9 +130,9 @@ void rightRotate(rbtree *t, node *n)
 
     // updating counts
     n->count -= pivot->count;
-    n->count += n->left->count;
+    n->count += pivot->right->count;
 
-    pivot->count -= n->left->count;
+    pivot->count -= pivot->right->count;
     pivot->count += n->count;
 
     // connecting n's parent -> pivot
@@ -495,18 +495,13 @@ void delete_node(rbtree *tree, int key)
         y = minimum(tree, z->right);
         y_original_color = y->color;
         x = y->right;
-        node *q;
 
         if (y->parent == z)
         {
-            q = y;
-
             x->parent = y;
         }
         else
         {
-            q = y->parent;
-
             transplant(tree, y, y->right);
             y->right = z->right;
             y->right->parent = y;
@@ -517,7 +512,7 @@ void delete_node(rbtree *tree, int key)
         y->left->parent = y;
         y->color = z->color;
 
-        update_count(q);
+        update_count(y);
     }
 
     if (y_original_color == BLACK)
